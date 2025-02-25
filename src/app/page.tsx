@@ -1,95 +1,98 @@
+"use client";
+
 import Image from "next/image";
 import styles from "./page.module.css";
+import { useState, useEffect, useCallback } from "react";
+import { GitHubUser } from "types";
+
+import useDebounce from "../hooks/useDebounce";
+import Link from "next/link";
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL;
+const API_SEARCH_URL = process.env.NEXT_PUBLIC_API_SEARCH_URL;
 
 export default function Home() {
+  const [users, setUsers] = useState<GitHubUser[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+
+  const debouncedSearchQuery = useDebounce(searchQuery, 500);
+
+  const fetchUsers = useCallback(async () => {
+    if (!API_URL || !API_SEARCH_URL) {
+      console.error("API URLs not set");
+      return;
+    }
+
+    const endpoint = debouncedSearchQuery
+      ? `${API_SEARCH_URL}${debouncedSearchQuery}`
+      : API_URL;
+
+    try {
+      setIsLoading(true);
+      const response = await fetch(endpoint);
+      const data = await response.json();
+      const formattedUsers = debouncedSearchQuery ? data.items : data;
+
+      setUsers(formattedUsers);
+    } catch (error) {
+      console.error("Error fetching users:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [debouncedSearchQuery]);
+
+  useEffect(() => {
+    fetchUsers();
+  }, [fetchUsers, debouncedSearchQuery]);
+
+  const handleSearch = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const query = event.target.value;
+    setSearchQuery(query);
+  };
+
   return (
     <div className={styles.page}>
       <main className={styles.main}>
-        <Image
-          className={styles.logo}
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol>
-          <li>
-            Get started by editing <code>src/app/page.tsx</code>.
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+        <h1 className={styles.title}>GitHub Users Search</h1>
 
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-            className={styles.secondary}
-          >
-            Read our docs
-          </a>
+        <div className={styles.searchContainer}>
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={handleSearch}
+            placeholder="Search GitHub users..."
+            className={styles.searchInput}
+          />
+        </div>
+        {isLoading && <div className={styles.loading}>Loading...</div>}
+
+        <div className={styles.usersGrid}>
+          {users.map((user) => (
+            <div key={user.id} className={styles.userCard}>
+              <div className={styles.userAvatar}>
+                <Image
+                  src={user.avatar_url}
+                  alt={`${user.login}'s avatar`}
+                  width={100}
+                  height={100}
+                />
+              </div>
+              <div className={styles.userInfo}>
+                <h2>{user.login}</h2>
+                <div className={styles.actions}>
+                  <Link
+                    href={`/user/${user.login}`}
+                    className={styles.detailsButton}
+                  >
+                    View Details
+                  </Link>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       </main>
-      <footer className={styles.footer}>
-        <a
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
     </div>
   );
 }
